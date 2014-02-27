@@ -34,40 +34,70 @@
 
 (def all-combinations
   (let [letters [\A \B \C \D \E \F]]
-    (for [n1 letters n2 letters n3 letters n4 letters]
-      (str n1 n2 n3 n4))))
+    (vec
+      (for [n1 letters n2 letters n3 letters n4 letters]
+        (str n1 n2 n3 n4)))))
 
-(defn remembering-guesser [history]
+(def all-scores
+  (vec
+    (for [black (range 5) white (range (- 5 black))]
+      [black white])))
+
+(defn remembering-guess [history]
   (let [find-comb (fn [guess] (when (consistent-with-history? guess history)
                                 guess))
         letters [\A \B \C \D \E \F]
         combination (some find-comb all-combinations)]
     combination))
 
-(def p-dist (zipmap all-combinations (repeat 1296 1/1296)))
+(def p-dist (vec (repeat 1296 (float 1/1296))))
 
-(defn- normalize [dist]
-  (try+
-    (let [total (reduce + (vals dist))]
-      (persistent! (reduce (fn [m [k v]] (assoc! m k (/ v total))) (transient {}) dist)))
-    (catch ArithmeticException e
-      (throw+ {:type ::inconsistent-hint}))))
+(defn code->index [code]
+  (reduce #(+ (* 6 %) (- (long %2) 65)) 0 code))
+
+(defn index->code [index]
+  (nth all-combinations index))
+
+(defn score->index [[black white]]
+  (+ white (/ (* (- 11 black) black) 2)))
+
+(defn index->score [index]
+  (nth all-scores index))
+
+(defn normalise [^doubles dist]
+  (let [sum (reduce + dist)]
+    (mapv (fn [^double x] (/ x sum)) dist)))
 
 (defn- ^:testable bayesian-update [dist guess hint]
-  (letfn [(likelihood [code guess hint] (if (= (score guess code) hint) 1 0))
-          (posterior [m [code _]] (assoc! m code (if (zero? (dist code)) 0 (likelihood code guess hint))))]
-    (normalize (persistent! (reduce posterior (transient {}) dist)))))
+  (letfn [(likelihood [code] (if (= (score guess code) hint) 1 0))
+          (posterior [v index prob] (assoc! v index (if (zero? prob) 0 (likelihood (index->code index)))))]
+    (normalise (persistent! (reduce-kv posterior (transient []) dist)))))
 
 (defn- ^:testable entropy [dist]
-  (- (reduce + (map (fn [[k v]] (if (zero? v) 0 (* v (Math/log v)))) dist))))
+  (- (reduce + (mapv (fn [p] (if (zero? p) 0 (* p (Math/log p)))) dist))))
 
 (defn- ^:testable score-dist [dist guess]
-  (reduce (fn [m [code prob]] (merge-with + m {(score code guess) prob})) {} dist))
+  (reduce-kv (fn [v index prob] (update-in v [(score->index (score (index->code index) guess))] + prob))
+             (vec (repeat 15 0)) dist))
+
+(defn- certain-answer? [dist]
+  (if (some (partial == 1) dist)
+    (some identity (map-indexed
+                     (fn [index p]
+                       (when (== p 1)
+                         (index->code index))) dist))))
 
 (defn max-entropy-guess [dist]
-  (let [sd (partial score-dist dist)
-        ent (fn [code] (if (= (dist code) 1) 10 (entropy (sd code))))]
-    (apply max-key ent all-combinations)))
+  (if-let [answer (certain-answer? dist)]
+    answer
+    (let [sd (partial score-dist dist)]
+      (loop [m-ent 0 [code & r] all-combinations index 0 guess nil]
+        (if code
+          (let [s (entropy (sd code))]
+            (if (> s m-ent)
+              (recur s r (inc index) code)
+              (recur m-ent r (inc index) guess)))
+          guess)))))
 
 (defrecord random-guesser []
   Guesser
@@ -78,7 +108,7 @@
 (defrecord r-guesser [mem]
   Guesser
   (init-memory [this] (reset! mem {}))
-  (make-guess [this] (remembering-guesser @mem))
+  (make-guess [this] (remembering-guess @mem))
   (add-hint [this guess hint] (swap! mem assoc guess hint)))
 
 (defrecord max-ent-guesser [probability-distribution]
