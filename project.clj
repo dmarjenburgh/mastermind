@@ -5,7 +5,6 @@
             :url "http://www.opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [slingshot "0.10.3"]
-                 [net.mikera/core.matrix "0.20.0"]
-                 [net.mikera/vectorz "0.26.0"]
+                 [clojure-csv/clojure-csv "2.0.1"]
                  [criterium "0.4.3"]]
   :main mastermind.core)
