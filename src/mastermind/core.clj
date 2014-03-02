@@ -4,10 +4,10 @@
             [mastermind.game :refer [play]]))
 
 (defn- pick-guesser []
-  (println "Choose a guessing strategy for the computer")
-  (println "1. Random (very dumb)")
-  (println "2. With memory (ok-ish)")
-  (println "3. Bayesian maximum entropy (smart, but slow)")
+  (println "\nChoose a guessing strategy for the computer")
+  (println "1. Random (dumb, avg 1296 guesses)")
+  (println "2. With memory (ok, avg 5.7 guesses)")
+  (println "3. Bayesian maximum entropy (smart, avg 4.415 guesses)")
   (println "\n[1-3]: ")
   (Long. (read-line)))
 
