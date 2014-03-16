@@ -7,4 +7,5 @@
                  [slingshot "0.10.3"]
                  [clojure-csv/clojure-csv "2.0.1"]
                  [criterium "0.4.3"]]
+  :profiles {:dev {:dependencies [[midje "1.6.3"]]}}
   :main mastermind.core)
